@@ -1,0 +1,19 @@
+{
+  "name": "opencode-hud",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "OpenCode plugin that displays real-time TPS, average TPS, TTFT, and other AI streaming metrics as a HUD overlay.",
+  "scripts": {
+    "test": "bun test",
+    "typecheck": "tsc --noEmit",
+    "build": "tsc"
+  },
+  "devDependencies": {
+    "@opencode-ai/plugin": "latest",
+    "typescript": "^5.0.0",
+    "bun-types": "latest",
+    "@types/bun": "latest"
+  },
+  "module": "src/index.ts",
+  "private": true
+}
