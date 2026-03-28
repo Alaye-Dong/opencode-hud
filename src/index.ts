@@ -83,7 +83,7 @@ export const HudPlugin: Plugin = async ({ client }) => {
           }
 
           const assistantMsg = assistantMessages.get(messageId)
-          if (assistantMsg?.tokens?.output !== undefined) {
+          if (assistantMsg?.tokens?.output !== undefined && assistantMsg.tokens.output > 0) {
             const output = assistantMsg.tokens.output
             const reasoning = assistantMsg.tokens.reasoning ?? 0
             metrics.totalTokens = output + reasoning
@@ -114,10 +114,6 @@ export const HudPlugin: Plugin = async ({ client }) => {
             log(`  SKIP: streamingStartTime is null`)
             break
           }
-          if (metrics.totalTokens === 0) {
-            log(`  SKIP: totalTokens is 0`)
-            break
-          }
 
           const assistantMsg = metrics.currentMessageId 
             ? assistantMessages.get(metrics.currentMessageId) 
@@ -128,6 +124,11 @@ export const HudPlugin: Plugin = async ({ client }) => {
             const reasoning = assistantMsg.tokens.reasoning ?? 0
             metrics.totalTokens = output + reasoning
             log(`  final tokens from API: output=${output} reasoning=${reasoning} total=${metrics.totalTokens}`)
+          }
+
+          if (metrics.totalTokens === 0) {
+            log(`  SKIP: totalTokens is 0`)
+            break
           }
 
           metrics.completionTime = now()
