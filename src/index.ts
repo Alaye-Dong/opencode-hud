@@ -1,18 +1,28 @@
-/**
- * OpenCode HUD Plugin — Main Entry Point
- */
-
 import type { Plugin } from "@opencode-ai/plugin"
-import type { Event, Session, Part, TextPart } from "@opencode-ai/sdk"
-import { buildHudStats, createFreshMetrics, calcTtft } from "./metrics.js"
+import type { Session, Part, TextPart } from "@opencode-ai/sdk"
+import { appendFileSync, mkdirSync, existsSync } from "fs"
+import { dirname } from "path"
 import { showHud } from "./display.js"
 import type { SessionMetrics } from "./types.js"
+import { createFreshMetrics, formatDuration } from "./metrics.js"
 
-const INTERVAL_MS = 200
+const LOG_FILE = ".opencode/hud-debug.log"
+
+function log(msg: string): void {
+  const timestamp = new Date().toISOString().slice(11, 23)
+  try {
+    if (!existsSync(LOG_FILE)) mkdirSync(dirname(LOG_FILE), { recursive: true })
+    appendFileSync(LOG_FILE, `[${timestamp}] ${msg}\n`)
+  } catch {}
+}
 
 export const HudPlugin: Plugin = async ({ client }) => {
   const sessions = new Map<string, SessionMetrics>()
   const messageRoles = new Map<string, "user" | "assistant">()
+
+  function isTextPart(part: Part): part is TextPart {
+    return part.type === "text" && "text" in part
+  }
 
   function getOrCreate(sessionId: string): SessionMetrics {
     let m = sessions.get(sessionId)
@@ -23,52 +33,19 @@ export const HudPlugin: Plugin = async ({ client }) => {
     return m
   }
 
-  function stopInterval(metrics: SessionMetrics): void {
-    if (metrics.intervalId !== null) {
-      clearInterval(metrics.intervalId)
-      metrics.intervalId = null
-    }
-  }
-
-  function startInterval(metrics: SessionMetrics): void {
-    if (metrics.intervalId !== null) return
-
-    metrics.intervalId = setInterval(async () => {
-      const now = Date.now()
-      const stats = buildHudStats(metrics, now)
-
-      metrics.lastTokenSnapshot = metrics.totalTokens
-      metrics.lastSnapshotTime = now
-
-      await showHud(client, stats)
-    }, INTERVAL_MS)
-  }
-
-  function resetRoundStats(metrics: SessionMetrics): void {
-    stopInterval(metrics)
-    metrics.streamingStartTime = null
-    metrics.ttft = null
-    metrics.totalTokens = 0
-    metrics.lastTokenSnapshot = 0
-    metrics.lastSnapshotTime = null
-    metrics.currentMessageId = null
-  }
-
-  function isTextPart(part: Part): part is TextPart {
-    return part.type === "text" && "text" in part
-  }
-
   return {
     event: async ({ event }) => {
       switch (event.type) {
         case "session.created": {
           const session = event.properties.info as Session
+          log(`session.created: id=${session.id}`)
           sessions.set(session.id, createFreshMetrics())
           break
         }
 
         case "message.updated": {
           const msg = event.properties.info
+          log(`message.updated: id=${msg.id} role=${msg.role} sessionID=${msg.sessionID}`)
           messageRoles.set(msg.id, msg.role)
 
           if (msg.role === "user") {
@@ -84,52 +61,71 @@ export const HudPlugin: Plugin = async ({ client }) => {
 
           const sessionId = part.sessionID
           const messageId = part.messageID
+          log(`message.part.updated: sessionId=${sessionId} messageId=${messageId} msgRole=${messageRoles.get(messageId)}`)
 
-          // Only track assistant message tokens (output speed)
-          const msgRole = messageRoles.get(messageId)
-          if (msgRole !== "assistant") break
+          if (messageRoles.get(messageId) !== "assistant") {
+            log(`  SKIP: not assistant`)
+            break
+          }
 
           const metrics = getOrCreate(sessionId)
+          log(`  metrics: totalTokens=${metrics.totalTokens} streamingStartTime=${metrics.streamingStartTime}`)
 
-          if (messageId && messageId !== metrics.currentMessageId) {
-            resetRoundStats(metrics)
+          if (messageId !== metrics.currentMessageId) {
+            metrics.streamingStartTime = null
+            metrics.totalTokens = 0
             metrics.currentMessageId = messageId
           }
 
           metrics.totalTokens = part.text.length
 
           if (metrics.streamingStartTime === null) {
-            const now = Date.now()
-            metrics.streamingStartTime = now
-            metrics.lastSnapshotTime = now
-
-            if (metrics.promptSentAt !== null) {
-              metrics.ttft = calcTtft(metrics.promptSentAt, now)
-            }
-
-            startInterval(metrics)
+            metrics.streamingStartTime = Date.now()
           }
           break
         }
 
         case "session.idle": {
           const sessionId = event.properties.sessionID
+          log(`session.idle: sessionId=${sessionId}`)
+          
           const metrics = sessions.get(sessionId)
-          if (metrics) stopInterval(metrics)
+          log(`  metrics: ${JSON.stringify(metrics)}`)
+          
+          if (!metrics) {
+            log(`  SKIP: no metrics`)
+            break
+          }
+          if (metrics.streamingStartTime === null) {
+            log(`  SKIP: streamingStartTime is null`)
+            break
+          }
+          if (metrics.totalTokens === 0) {
+            log(`  SKIP: totalTokens is 0`)
+            break
+          }
+
+          const elapsedMs = Date.now() - metrics.streamingStartTime
+          const elapsedSec = elapsedMs / 1000
+          const avgTps = elapsedSec > 0 ? (metrics.totalTokens / elapsedSec) : 0
+          const ttft = metrics.promptSentAt !== null
+            ? metrics.streamingStartTime - metrics.promptSentAt
+            : null
+
+          const message = `⚡ ${avgTps.toFixed(1)} t/s  TTFT ${ttft !== null ? formatDuration(ttft) : "--"}  [${metrics.totalTokens} tok / ${elapsedSec.toFixed(1)}s]`
+          log(`  SHOWING: ${message}`)
+
+          await showHud(client, { message })
           break
         }
 
         case "message.removed": {
-          const msg = event.properties
-          messageRoles.delete(msg.messageID)
+          messageRoles.delete(event.properties.messageID)
           break
         }
 
         case "session.deleted": {
-          const session = event.properties.info as Session
-          const metrics = sessions.get(session.id)
-          if (metrics) stopInterval(metrics)
-          sessions.delete(session.id)
+          sessions.delete((event.properties.info as Session).id)
           break
         }
       }
