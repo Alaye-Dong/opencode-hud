@@ -18,15 +18,19 @@ A plugin for [OpenCode](https://opencode.ai) that displays token streaming metri
 
 ## Installation
 
-### Local Development
-
-This plugin auto-loads when you run `opencode` from this directory.
-
 ### From npm
 
-```bash
-bun add opencode-hud
+Add the plugin to your `.opencode/opencode.json`:
+
+```json
+{
+  "plugin": ["opencode-hud@latest"]
+}
 ```
+
+### Local Development
+
+This plugin auto-loads when you run `opencode` from this directory, because it lives in `.opencode/plugins/`.
 
 ## Configuration
 
