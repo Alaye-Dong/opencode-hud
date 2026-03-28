@@ -1,6 +1,7 @@
 export interface SessionMetrics {
-  promptSentAt: number | null
+  requestStartTime: number | null
   streamingStartTime: number | null
+  completionTime: number | null
   totalTokens: number
   currentMessageId: string | null
 }

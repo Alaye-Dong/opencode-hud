@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { formatDuration, createFreshMetrics } from "../src/metrics.js"
+import { formatDuration, createFreshMetrics, now } from "../src/metrics.js"
 
 describe("formatDuration", () => {
   test("formats milliseconds", () => {
@@ -14,9 +14,18 @@ describe("formatDuration", () => {
 describe("createFreshMetrics", () => {
   test("creates fresh metrics with null values", () => {
     const metrics = createFreshMetrics()
-    expect(metrics.promptSentAt).toBeNull()
+    expect(metrics.requestStartTime).toBeNull()
     expect(metrics.streamingStartTime).toBeNull()
+    expect(metrics.completionTime).toBeNull()
     expect(metrics.totalTokens).toBe(0)
     expect(metrics.currentMessageId).toBeNull()
+  })
+})
+
+describe("now", () => {
+  test("returns a number from performance.now()", () => {
+    const t = now()
+    expect(typeof t).toBe("number")
+    expect(t).toBeGreaterThan(0)
   })
 })

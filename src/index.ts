@@ -4,7 +4,7 @@ import { appendFileSync, mkdirSync, existsSync } from "fs"
 import { dirname } from "path"
 import { showHud } from "./display.js"
 import type { SessionMetrics } from "./types.js"
-import { createFreshMetrics, formatDuration } from "./metrics.js"
+import { createFreshMetrics, formatDuration, now } from "./metrics.js"
 
 const LOG_FILE = ".opencode/hud-debug.log"
 
@@ -50,7 +50,7 @@ export const HudPlugin: Plugin = async ({ client }) => {
 
           if (msg.role === "user") {
             const metrics = getOrCreate(msg.sessionID)
-            metrics.promptSentAt = Date.now()
+            metrics.requestStartTime = now()
           }
           break
         }
@@ -80,7 +80,7 @@ export const HudPlugin: Plugin = async ({ client }) => {
           metrics.totalTokens = part.text.length
 
           if (metrics.streamingStartTime === null) {
-            metrics.streamingStartTime = Date.now()
+            metrics.streamingStartTime = now()
           }
           break
         }
@@ -105,12 +105,14 @@ export const HudPlugin: Plugin = async ({ client }) => {
             break
           }
 
-          const elapsedMs = Date.now() - metrics.streamingStartTime
+          metrics.completionTime = now()
+
+          const ttft = metrics.requestStartTime !== null && metrics.streamingStartTime !== null
+            ? metrics.streamingStartTime - metrics.requestStartTime
+            : null
+          const elapsedMs = metrics.completionTime - metrics.streamingStartTime!
           const elapsedSec = elapsedMs / 1000
           const avgTps = elapsedSec > 0 ? (metrics.totalTokens / elapsedSec) : 0
-          const ttft = metrics.promptSentAt !== null
-            ? metrics.streamingStartTime - metrics.promptSentAt
-            : null
 
           const message = `⚡ ${avgTps.toFixed(1)} t/s  TTFT ${ttft !== null ? formatDuration(ttft) : "--"}  [${metrics.totalTokens} tok / ${elapsedSec.toFixed(1)}s]`
           log(`  SHOWING: ${message}`)
