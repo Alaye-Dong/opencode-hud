@@ -1,22 +1,16 @@
 import type { Plugin } from "@opencode-ai/plugin"
 import type { Session, Part, TextPart, Message, AssistantMessage } from "@opencode-ai/sdk"
-import { appendFileSync, mkdirSync, existsSync } from "fs"
-import { dirname } from "path"
 import { showHud } from "./display.js"
 import type { SessionMetrics } from "./types.js"
 import { createFreshMetrics, formatDuration, now, estimateTokens } from "./metrics.js"
+import { log } from "./logger.js"
+import { loadConfigFromFile } from "./config.js"
 
-const LOG_FILE = ".opencode/hud-debug.log"
-
-function log(msg: string): void {
-  const timestamp = new Date().toISOString().slice(11, 23)
-  try {
-    if (!existsSync(LOG_FILE)) mkdirSync(dirname(LOG_FILE), { recursive: true })
-    appendFileSync(LOG_FILE, `[${timestamp}] ${msg}\n`)
-  } catch {}
-}
+export { setConfig, getConfig, resetConfig } from "./config.js"
+export type { HudConfig } from "./config.js"
 
 export const HudPlugin: Plugin = async ({ client }) => {
+  loadConfigFromFile()
   const sessions = new Map<string, SessionMetrics>()
   const messageRoles = new Map<string, "user" | "assistant">()
   const assistantMessages = new Map<string, AssistantMessage>()

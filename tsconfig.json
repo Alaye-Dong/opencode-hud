@@ -6,10 +6,12 @@
     "lib": ["ESNext"],
     "types": ["bun-types"],
     "strict": true,
-    "noEmit": true,
     "skipLibCheck": true,
-    "outDir": "./dist"
+    "outDir": "./dist",
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true
   },
-  "include": ["src/**/*", "tests/**/*"],
-  "exclude": [".opencode/**/*", "node_modules"]
+  "include": ["src/**/*"],
+  "exclude": [".opencode/**/*", "node_modules", "tests"]
 }

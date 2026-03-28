@@ -2,18 +2,49 @@
   "name": "opencode-hud",
   "version": "0.1.0",
   "type": "module",
-  "description": "OpenCode plugin that displays real-time TPS, average TPS, TTFT, and other AI streaming metrics as a HUD overlay.",
+  "description": "OpenCode plugin that displays TPS, TTFT, and token metrics at conversation end.",
+  "main": "dist/index.js",
+  "module": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
   "scripts": {
     "test": "bun test",
     "typecheck": "tsc --noEmit",
-    "build": "tsc"
+    "build": "tsc",
+    "prepublishOnly": "bun run typecheck && bun test && bun run build"
+  },
+  "keywords": [
+    "opencode",
+    "opencode-plugin",
+    "tps",
+    "ttft",
+    "metrics",
+    "ai",
+    "llm"
+  ],
+  "license": "MIT",
+  "peerDependencies": {
+    "@opencode-ai/plugin": ">=0.1.0",
+    "@opencode-ai/sdk": ">=0.1.0"
   },
   "devDependencies": {
     "@opencode-ai/plugin": "latest",
+    "@opencode-ai/sdk": "latest",
     "typescript": "^5.0.0",
     "bun-types": "latest",
     "@types/bun": "latest"
   },
-  "module": "src/index.ts",
-  "private": true
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Alaye-Dong/opencode-hud.git"
+  }
 }
