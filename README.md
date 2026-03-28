@@ -1,27 +1,48 @@
 # OpenCode HUD Plugin
 
-A plugin for [OpenCode](https://opencode.ai) that displays a real-time performance HUD while the AI is streaming a response.
+A plugin for [OpenCode](https://opencode.ai) that displays token streaming metrics at the end of each conversation.
 
 ## Metrics Displayed
 
 | Metric | Description |
 |--------|-------------|
-| ⚡ Current TPS | Instantaneous tokens per second (last 200ms window) |
-| avg TPS | Average tokens per second since streaming began |
-| TTFT | Time To First Token — latency from your message to the first response token |
-| Total tokens | Cumulative token count for the current response |
+| ⚡ Avg TPS | Average tokens per second (includes reasoning tokens) |
+| TTFT | Time To First Token — latency from request to first response token |
+| Total tokens | Cumulative token count from API (output + reasoning) |
 | Elapsed time | Wall-clock time since the first token |
 
-**Example HUD toast:**
+**Example toast:**
 ```
-⚡ 45.2 t/s  avg 38.1 t/s  TTFT 312ms  [1.2k tok / 27.5s]
+⚡ 42.5 t/s  TTFT 312ms  [639 tok / 15.0s]
 ```
 
 ## Installation
 
-This plugin auto-loads when you run `opencode` from this directory, because it lives in `.opencode/plugins/`.
+### Local Development
 
-To use it globally, copy `src/` to `~/.config/opencode/plugins/`.
+This plugin auto-loads when you run `opencode` from this directory.
+
+### From npm
+
+```bash
+bun add opencode-hud
+```
+
+## Configuration
+
+Create a config file at `~/.config/opencode/opencode-hud.json`:
+
+```json
+{
+  "enableLogging": true,
+  "logFilePath": ".opencode/hud-debug.log"
+}
+```
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `enableLogging` | boolean | `false` | Enable debug logging |
+| `logFilePath` | string | `.opencode/hud-debug.log` | Path to log file |
 
 ## Development
 
@@ -29,11 +50,14 @@ To use it globally, copy `src/` to `~/.config/opencode/plugins/`.
 # Install dependencies (Bun required)
 bun install
 
-# Run unit + integration tests
+# Run tests
 bun test
 
 # Type-check
 bun run typecheck
+
+# Build
+bun run build
 ```
 
 ## Project Structure
@@ -45,22 +69,36 @@ opencode-hud/
 │   └── plugins/
 │       └── hud.ts             # Plugin entry (auto-loaded by OpenCode)
 ├── src/
-│   ├── types.ts               # Shared TypeScript interfaces
-│   ├── metrics.ts             # Pure calculation functions (TPS, TTFT, etc.)
-│   ├── display.ts             # Toast formatting and emission
-│   └── index.ts               # Plugin main entry — registers event hooks
+│   ├── index.ts               # Plugin main entry — event handlers
+│   ├── config.ts              # Configuration management
+│   ├── logger.ts              # Configurable logging
+│   ├── types.ts               # TypeScript interfaces
+│   ├── metrics.ts             # Token estimation, duration formatting
+│   └── display.ts             # Toast formatting and emission
 ├── tests/
-│   ├── metrics.test.ts        # Unit tests for calculation logic
-│   └── integration.test.ts    # Event flow integration tests
+│   ├── metrics.test.ts        # Unit tests
+│   └── integration.test.ts    # Event flow tests
+├── dist/                      # Build output
 ├── package.json
 └── tsconfig.json
 ```
 
 ## Architecture
 
-The plugin uses a **`setInterval`-driven display loop** (not event-driven) so the HUD Toast stays visible even during tool calls when the text stream briefly pauses.
+The plugin listens to OpenCode events and displays metrics when a conversation ends (`session.idle`).
 
-Key design decisions:
-- `streamingStartTime` is set on the **first token**, not on `session.created`, to exclude LLM think-time from speed calculations
-- `messageID` changes in `message.part.updated` detect new conversation rounds and reset per-round stats (prevents cross-round state pollution)
-- Each session has its own independent state, so multiple parallel sessions work correctly
+**Event Flow:**
+1. `message.updated` (user) → Record request start time
+2. `message.updated` (assistant) → Store message with tokens info
+3. `message.part.updated` → Track first token time, count tokens
+4. `session.idle` → Calculate metrics and show toast
+
+**Token Counting:**
+- Primary: Uses API-provided `tokens.output + tokens.reasoning`
+- Fallback: Estimates from text length (`length / 3`)
+
+**Key Design Decisions:**
+- `requestStartTime` set on user message to capture full TTFT
+- `streamingStartTime` set on first assistant token (lazy init)
+- Token count includes reasoning tokens for accurate TPS
+- Uses `performance.now()` for high-precision timing
