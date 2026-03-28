@@ -30,11 +30,14 @@ globalThis.clearInterval = mockClearInterval as unknown as typeof clearInterval
 
 // ── Mock OpenCode client ───────────────────────────────────────────────────
 
-const emittedEvents: unknown[] = []
+const emittedToasts: Array<{ message: string; variant: string; duration?: number }> = []
 const mockClient = {
-  event: {
-    emit: mock(async (payload: unknown) => {
-      emittedEvents.push(payload)
+  tui: {
+    showToast: mock(async (params: { body?: { message?: string; variant?: string; duration?: number } }) => {
+      if (params.body) {
+        emittedToasts.push({ message: params.body.message ?? "", variant: params.body.variant ?? "info", duration: params.body.duration })
+      }
+      return { data: true, error: null }
     }),
   },
 }
@@ -46,7 +49,7 @@ function makeSessionCreated(sessionId: string) {
 }
 
 function makeMessageUpdated(sessionId: string, role: "user" | "assistant", msgId: string) {
-  return { type: "message.updated", properties: { sessionID: sessionId, message: { role, id: msgId } } }
+  return { type: "message.updated", properties: { info: { id: msgId, sessionID: sessionId, role } } }
 }
 
 function makePartUpdated(sessionId: string, messageId: string, text: string) {
@@ -55,7 +58,7 @@ function makePartUpdated(sessionId: string, messageId: string, text: string) {
     properties: {
       sessionID: sessionId,
       messageID: messageId,
-      part: { type: "text", text, messageID: messageId },
+      part: { type: "text", text, sessionID: sessionId, messageID: messageId, id: `part-${messageId}` },
     },
   }
 }
@@ -65,7 +68,7 @@ function makeSessionIdle(sessionId: string) {
 }
 
 function makeSessionDeleted(sessionId: string) {
-  return { type: "session.deleted", properties: { sessionID: sessionId } }
+  return { type: "session.deleted", properties: { info: { id: sessionId } } }
 }
 
 // ── Tests ──────────────────────────────────────────────────────────────────
@@ -76,10 +79,10 @@ describe("HudPlugin integration", () => {
   beforeEach(async () => {
     mockIntervalId = 0
     activeIntervals.clear()
-    emittedEvents.length = 0
+    emittedToasts.length = 0
     mockSetInterval.mockClear()
     mockClearInterval.mockClear()
-    mockClient.event.emit.mockClear()
+    mockClient.tui.showToast.mockClear()
 
     // Re-import fresh module (clear module cache via dynamic import with cache-bust)
     const { HudPlugin } = await import(`../src/index.js?t=${Date.now()}`)
@@ -95,6 +98,7 @@ describe("HudPlugin integration", () => {
   test("first message.part.updated starts the interval and sets streamingStartTime", async () => {
     await eventHook({ event: makeSessionCreated("sess-1") })
     await eventHook({ event: makeMessageUpdated("sess-1", "user", "msg-1") })
+    await eventHook({ event: makeMessageUpdated("sess-1", "assistant", "msg-2") })
     await eventHook({ event: makePartUpdated("sess-1", "msg-2", "Hello") })
 
     expect(mockSetInterval).toHaveBeenCalledTimes(1)
@@ -102,6 +106,7 @@ describe("HudPlugin integration", () => {
 
   test("interval is NOT restarted on subsequent tokens in the same round", async () => {
     await eventHook({ event: makeSessionCreated("sess-1") })
+    await eventHook({ event: makeMessageUpdated("sess-1", "assistant", "msg-2") })
     await eventHook({ event: makePartUpdated("sess-1", "msg-2", "Hello") })
     await eventHook({ event: makePartUpdated("sess-1", "msg-2", "Hello world") })
     await eventHook({ event: makePartUpdated("sess-1", "msg-2", "Hello world!") })
@@ -112,20 +117,20 @@ describe("HudPlugin integration", () => {
   test("interval fires and emits a tui.toast.show event", async () => {
     await eventHook({ event: makeSessionCreated("sess-1") })
     await eventHook({ event: makeMessageUpdated("sess-1", "user", "msg-1") })
+    await eventHook({ event: makeMessageUpdated("sess-1", "assistant", "msg-2") })
     await eventHook({ event: makePartUpdated("sess-1", "msg-2", "Hello world!") })
 
     // Manually fire the interval callback
     const cb = activeIntervals.get(1)!
     await cb()
 
-    expect(emittedEvents.length).toBe(1)
-    const emitted = emittedEvents[0] as { type: string; properties: { message: string } }
-    expect(emitted.type).toBe("tui.toast.show")
-    expect(emitted.properties.message).toContain("t/s")
+    expect(emittedToasts.length).toBe(1)
+    expect(emittedToasts[0].message).toContain("t/s")
   })
 
   test("session.idle stops the interval", async () => {
     await eventHook({ event: makeSessionCreated("sess-1") })
+    await eventHook({ event: makeMessageUpdated("sess-1", "assistant", "msg-2") })
     await eventHook({ event: makePartUpdated("sess-1", "msg-2", "Hello") })
 
     expect(mockSetInterval).toHaveBeenCalledTimes(1)
@@ -135,6 +140,7 @@ describe("HudPlugin integration", () => {
 
   test("session.deleted stops interval and removes state", async () => {
     await eventHook({ event: makeSessionCreated("sess-1") })
+    await eventHook({ event: makeMessageUpdated("sess-1", "assistant", "msg-2") })
     await eventHook({ event: makePartUpdated("sess-1", "msg-2", "Hello") })
     await eventHook({ event: makeSessionDeleted("sess-1") })
 
@@ -148,6 +154,7 @@ describe("HudPlugin integration", () => {
 
     // Round 1
     await eventHook({ event: makeMessageUpdated("sess-1", "user", "msg-1") })
+    await eventHook({ event: makeMessageUpdated("sess-1", "assistant", "msg-2") })
     await eventHook({ event: makePartUpdated("sess-1", "msg-2", "A".repeat(500)) })
     await eventHook({ event: makeSessionIdle("sess-1") })
 
@@ -156,6 +163,7 @@ describe("HudPlugin integration", () => {
 
     // Round 2: new user message, new assistant messageId
     await eventHook({ event: makeMessageUpdated("sess-1", "user", "msg-3") })
+    await eventHook({ event: makeMessageUpdated("sess-1", "assistant", "msg-4") })
     await eventHook({ event: makePartUpdated("sess-1", "msg-4", "B") })
 
     // Interval should have been started fresh for round 2
