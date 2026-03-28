@@ -7,6 +7,11 @@ export function formatDuration(ms: number): string {
   return `${(ms / 1000).toFixed(2)}s`
 }
 
+export function estimateTokens(text: string): number {
+  if (!text) return 0
+  return Math.round(text.length / 3)
+}
+
 export function createFreshMetrics() {
   return {
     requestStartTime: null as number | null,

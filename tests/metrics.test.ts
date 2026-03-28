@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { formatDuration, createFreshMetrics, now } from "../src/metrics.js"
+import { formatDuration, createFreshMetrics, now, estimateTokens } from "../src/metrics.js"
 
 describe("formatDuration", () => {
   test("formats milliseconds", () => {
@@ -27,5 +27,17 @@ describe("now", () => {
     const t = now()
     expect(typeof t).toBe("number")
     expect(t).toBeGreaterThan(0)
+  })
+})
+
+describe("estimateTokens", () => {
+  test("returns 0 for empty string", () => {
+    expect(estimateTokens("")).toBe(0)
+  })
+
+  test("estimates tokens from text length", () => {
+    expect(estimateTokens("hello")).toBe(2)
+    expect(estimateTokens("hello world")).toBe(4)
+    expect(estimateTokens("a".repeat(300))).toBe(100)
   })
 })

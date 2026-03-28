@@ -1,10 +1,10 @@
 import type { Plugin } from "@opencode-ai/plugin"
-import type { Session, Part, TextPart } from "@opencode-ai/sdk"
+import type { Session, Part, TextPart, Message, AssistantMessage } from "@opencode-ai/sdk"
 import { appendFileSync, mkdirSync, existsSync } from "fs"
 import { dirname } from "path"
 import { showHud } from "./display.js"
 import type { SessionMetrics } from "./types.js"
-import { createFreshMetrics, formatDuration, now } from "./metrics.js"
+import { createFreshMetrics, formatDuration, now, estimateTokens } from "./metrics.js"
 
 const LOG_FILE = ".opencode/hud-debug.log"
 
@@ -19,6 +19,7 @@ function log(msg: string): void {
 export const HudPlugin: Plugin = async ({ client }) => {
   const sessions = new Map<string, SessionMetrics>()
   const messageRoles = new Map<string, "user" | "assistant">()
+  const assistantMessages = new Map<string, AssistantMessage>()
 
   function isTextPart(part: Part): part is TextPart {
     return part.type === "text" && "text" in part
@@ -44,13 +45,17 @@ export const HudPlugin: Plugin = async ({ client }) => {
         }
 
         case "message.updated": {
-          const msg = event.properties.info
+          const msg = event.properties.info as Message
           log(`message.updated: id=${msg.id} role=${msg.role} sessionID=${msg.sessionID}`)
           messageRoles.set(msg.id, msg.role)
 
           if (msg.role === "user") {
             const metrics = getOrCreate(msg.sessionID)
             metrics.requestStartTime = now()
+          } else if (msg.role === "assistant") {
+            const assistantMsg = msg as AssistantMessage
+            assistantMessages.set(msg.id, assistantMsg)
+            log(`  assistant tokens: input=${assistantMsg.tokens?.input} output=${assistantMsg.tokens?.output}`)
           }
           break
         }
@@ -77,7 +82,14 @@ export const HudPlugin: Plugin = async ({ client }) => {
             metrics.currentMessageId = messageId
           }
 
-          metrics.totalTokens = part.text.length
+          const assistantMsg = assistantMessages.get(messageId)
+          if (assistantMsg?.tokens?.output) {
+            metrics.totalTokens = assistantMsg.tokens.output
+            log(`  using API tokens: ${metrics.totalTokens}`)
+          } else {
+            metrics.totalTokens = estimateTokens(part.text)
+            log(`  using estimated tokens: ${metrics.totalTokens}`)
+          }
 
           if (metrics.streamingStartTime === null) {
             metrics.streamingStartTime = now()
@@ -105,6 +117,15 @@ export const HudPlugin: Plugin = async ({ client }) => {
             break
           }
 
+          const assistantMsg = metrics.currentMessageId 
+            ? assistantMessages.get(metrics.currentMessageId) 
+            : undefined
+          
+          if (assistantMsg?.tokens?.output) {
+            metrics.totalTokens = assistantMsg.tokens.output
+            log(`  final tokens from API: ${metrics.totalTokens}`)
+          }
+
           metrics.completionTime = now()
 
           const ttft = metrics.requestStartTime !== null && metrics.streamingStartTime !== null
@@ -123,6 +144,7 @@ export const HudPlugin: Plugin = async ({ client }) => {
 
         case "message.removed": {
           messageRoles.delete(event.properties.messageID)
+          assistantMessages.delete(event.properties.messageID)
           break
         }
 
