@@ -55,7 +55,7 @@ export const HudPlugin: Plugin = async ({ client }) => {
           } else if (msg.role === "assistant") {
             const assistantMsg = msg as AssistantMessage
             assistantMessages.set(msg.id, assistantMsg)
-            log(`  assistant tokens: input=${assistantMsg.tokens?.input} output=${assistantMsg.tokens?.output}`)
+            log(`  assistant tokens: output=${assistantMsg.tokens?.output} reasoning=${assistantMsg.tokens?.reasoning}`)
           }
           break
         }
@@ -83,9 +83,11 @@ export const HudPlugin: Plugin = async ({ client }) => {
           }
 
           const assistantMsg = assistantMessages.get(messageId)
-          if (assistantMsg?.tokens?.output) {
-            metrics.totalTokens = assistantMsg.tokens.output
-            log(`  using API tokens: ${metrics.totalTokens}`)
+          if (assistantMsg?.tokens?.output !== undefined) {
+            const output = assistantMsg.tokens.output
+            const reasoning = assistantMsg.tokens.reasoning ?? 0
+            metrics.totalTokens = output + reasoning
+            log(`  using API tokens: output=${output} reasoning=${reasoning} total=${metrics.totalTokens}`)
           } else {
             metrics.totalTokens = estimateTokens(part.text)
             log(`  using estimated tokens: ${metrics.totalTokens}`)
@@ -121,9 +123,11 @@ export const HudPlugin: Plugin = async ({ client }) => {
             ? assistantMessages.get(metrics.currentMessageId) 
             : undefined
           
-          if (assistantMsg?.tokens?.output) {
-            metrics.totalTokens = assistantMsg.tokens.output
-            log(`  final tokens from API: ${metrics.totalTokens}`)
+          if (assistantMsg?.tokens?.output !== undefined) {
+            const output = assistantMsg.tokens.output
+            const reasoning = assistantMsg.tokens.reasoning ?? 0
+            metrics.totalTokens = output + reasoning
+            log(`  final tokens from API: output=${output} reasoning=${reasoning} total=${metrics.totalTokens}`)
           }
 
           metrics.completionTime = now()
