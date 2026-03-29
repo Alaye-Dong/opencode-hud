@@ -10,14 +10,14 @@ function makeEvent(type: string, properties: Record<string, unknown>) {
   return { type, properties }
 }
 
-describe("HudPlugin", () => {
+describe("hud", () => {
   let eventHook: (args: { event: unknown }) => Promise<void>
 
   beforeEach(async () => {
     mockClient.tui.showToast.mockClear()
 
-    const { HudPlugin } = await import(`../src/index.js?t=${Date.now()}`)
-    const hooks = await HudPlugin({ client: mockClient as never, project: null as never, $: null as never, directory: "", worktree: "" })
+    const { hud } = await import(`../src/index.js?t=${Date.now()}`)
+    const hooks = await hud({ client: mockClient as never, project: null as never, $: null as never, directory: "", worktree: "" })
     eventHook = hooks.event as typeof eventHook
   })
 
