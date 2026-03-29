@@ -96,10 +96,10 @@ export const hud: Plugin = async ({ client }) => {
         case "session.idle": {
           const sessionId = event.properties.sessionID
           log(`session.idle: sessionId=${sessionId}`)
-          
+
           const metrics = sessions.get(sessionId)
           log(`  metrics: ${JSON.stringify(metrics)}`)
-          
+
           if (!metrics) {
             log(`  SKIP: no metrics`)
             break
@@ -109,10 +109,10 @@ export const hud: Plugin = async ({ client }) => {
             break
           }
 
-          const assistantMsg = metrics.currentMessageId 
-            ? assistantMessages.get(metrics.currentMessageId) 
+          const assistantMsg = metrics.currentMessageId
+            ? assistantMessages.get(metrics.currentMessageId)
             : undefined
-          
+
           if (assistantMsg?.tokens?.output !== undefined) {
             const output = assistantMsg.tokens.output
             const reasoning = assistantMsg.tokens.reasoning ?? 0
@@ -156,4 +156,7 @@ export const hud: Plugin = async ({ client }) => {
   }
 }
 
+// Named "server" export is required by OpenCode's PluginModule type.
+// When loaded as an NPM package, opencode reads the `server` property of the module.
+export { hud as server }
 export default hud
