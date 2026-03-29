@@ -10,8 +10,13 @@
     ".": {
       "import": "./dist/index.js",
       "types": "./dist/index.d.ts"
+    },
+    "./server": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
     }
   },
+  "oc-plugin": ["server"],
   "files": [
     "dist",
     "README.md"
