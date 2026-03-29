@@ -6,9 +6,6 @@ import { createFreshMetrics, formatDuration, now, estimateTokens } from "./metri
 import { log } from "./logger.js"
 import { loadConfigFromFile } from "./config.js"
 
-export { setConfig, getConfig, resetConfig } from "./config.js"
-export type { HudConfig } from "./config.js"
-
 export const hud: Plugin = async ({ client }) => {
   loadConfigFromFile()
   const sessions = new Map<string, SessionMetrics>()

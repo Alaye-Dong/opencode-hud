@@ -3,6 +3,7 @@
   "version": "0.1.5",
   "type": "module",
   "description": "OpenCode plugin that displays TPS, TTFT, and token metrics at conversation end.",
+  "author": "alaye-dong",
   "main": "dist/index.js",
   "module": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -14,6 +15,10 @@
     "./server": {
       "import": "./dist/index.js",
       "types": "./dist/index.d.ts"
+    },
+    "./config": {
+      "import": "./dist/config-entry.js",
+      "types": "./dist/config-entry.d.ts"
     }
   },
   "oc-plugin": ["server"],
