@@ -9,7 +9,7 @@ import { loadConfigFromFile } from "./config.js"
 export { setConfig, getConfig, resetConfig } from "./config.js"
 export type { HudConfig } from "./config.js"
 
-export const HudPlugin: Plugin = async ({ client }) => {
+export const hud: Plugin = async ({ client }) => {
   loadConfigFromFile()
   const sessions = new Map<string, SessionMetrics>()
   const messageRoles = new Map<string, "user" | "assistant">()
