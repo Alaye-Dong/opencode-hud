@@ -155,3 +155,5 @@ export const hud: Plugin = async ({ client }) => {
     },
   }
 }
+
+export default hud

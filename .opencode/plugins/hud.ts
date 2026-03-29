@@ -1,1 +1,1 @@
-export { HudPlugin } from "../../src/index.js"
+export { hud as default } from "../../src/index.js"
