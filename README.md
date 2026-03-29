@@ -2,6 +2,9 @@
 
 A plugin for [OpenCode](https://opencode.ai) that displays token streaming metrics at the end of each conversation.
 
+> [!Warning] 
+  This plugin is still in developping. Maybe not available. 🐛
+
 ## Metrics Displayed
 
 | Metric | Description |
